@@ -103,6 +103,18 @@ export async function loadSite(
   const published = allPosts
     .filter((post) => !post.draft)
     .sort((a, b) => b.published!.localeCompare(a.published!));
+  if (settings.comments?.enabled) {
+    const keys = new Set<string>();
+    for (const post of published) {
+      if (!post.commentKey) {
+        throw new Error(`Comment Key is missing for ${post.slug}`);
+      }
+      if (keys.has(post.commentKey)) {
+        throw new Error(`Duplicate Comment Key for ${post.slug}`);
+      }
+      keys.add(post.commentKey);
+    }
+  }
   const posts = await Promise.all(
     published.map(async (post) => ({
       ...post,

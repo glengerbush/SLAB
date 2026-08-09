@@ -119,13 +119,14 @@ a:hover {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--space-4);
-  align-items: baseline;
+  align-items: end;
   padding-block: var(--space-4);
 }
 .site-title {
   color: var(--text);
-  font-size: 1.05rem;
+  font-size: 1.75rem;
   font-weight: 700;
+  line-height: 1;
   text-decoration: none;
 }
 .site-nav ul {

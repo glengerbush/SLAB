@@ -42,6 +42,8 @@ export interface SaveOptions {
   expectedRevision: string;
   now?: Date;
   confirmSlugChange?: boolean;
+  commentsEnabled?: boolean;
+  allowCommentKeyChange?: boolean;
 }
 
 async function withPostMutation<T>(root: string, mutation: () => Promise<T>) {
@@ -114,6 +116,8 @@ function serialize(data: PostData, body: string, existingFrontmatter = "") {
   document.set("tags", data.tags);
   document.set("aliases", data.aliases);
   document.set("socialImage", data.socialImage);
+  if (data.commentKey) document.set("commentKey", data.commentKey);
+  else document.delete("commentKey");
   const frontmatter = document.toString().trimEnd();
   return `---\n${frontmatter}\n---\n${body.startsWith("\n") ? body : `\n${body}`}`;
 }
@@ -203,6 +207,7 @@ async function createPostUnlocked(
   root: string,
   input: CreatePostInput,
   now = new Date(),
+  commentsEnabled = false,
 ) {
   const posts = await realPostsRoot(root);
   const data = postDataSchema.parse({
@@ -216,6 +221,10 @@ async function createPostUnlocked(
     tags: input.tags ?? [],
     aliases: input.aliases ?? [],
     socialImage: input.socialImage ?? null,
+    commentKey:
+      input.draft === false && commentsEnabled
+        ? `${input.title.trim()} [${randomUUID().replaceAll("-", "").slice(0, 12)}]`
+        : undefined,
   });
   await assertClaimsAvailable(root, data);
   const prefix = dateOnly(now).slice(2);
@@ -242,8 +251,11 @@ export function createPost(
   root: string,
   input: CreatePostInput,
   now = new Date(),
+  commentsEnabled = false,
 ) {
-  return withPostMutation(root, () => createPostUnlocked(root, input, now));
+  return withPostMutation(root, () =>
+    createPostUnlocked(root, input, now, commentsEnabled),
+  );
 }
 
 async function deletePostUnlocked(
@@ -326,11 +338,20 @@ async function savePostUnlocked(
     tags: input.tags,
     aliases,
     socialImage: input.socialImage,
+    commentKey: options.allowCommentKeyChange
+      ? input.commentKey
+      : current.commentKey,
   };
   if (current.draft && !input.draft && !raw.published) {
     raw.published = dateOnly(options.now);
   }
   let next = postDataSchema.parse(raw);
+  if (!next.draft && options.commentsEnabled && !next.commentKey) {
+    next = postDataSchema.parse({
+      ...next,
+      commentKey: `${next.title} [${randomUUID().replaceAll("-", "").slice(0, 12)}]`,
+    });
+  }
   if (current.published && readerVisibleChanged(current, next, input.body)) {
     next = postDataSchema.parse({ ...next, updated: dateOnly(options.now) });
   }

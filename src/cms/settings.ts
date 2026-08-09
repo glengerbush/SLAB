@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import YAML from "yaml";
 
 import { siteSettingsSchema, type SiteSettings } from "../lib/schema";
+import { ensureCommentKeys, removeCommentKeys } from "./comments";
 
 const mutationTails = new Map<string, Promise<void>>();
 
@@ -59,6 +60,9 @@ export function saveSiteSettings(
       );
     }
     const settings = siteSettingsSchema.parse(input);
+    if (settings.comments?.enabled && !current.settings.comments?.enabled) {
+      await ensureCommentKeys(root);
+    }
     const path = resolve(root, "site.config.yaml");
     const source = YAML.stringify(settings);
     const temporary = `${path}.${randomUUID()}.tmp`;
@@ -66,4 +70,57 @@ export function saveSiteSettings(
     await rename(temporary, path);
     return { settings, revision: revision(source) };
   });
+}
+
+export async function removeCommentsSetup(
+  root: string,
+  expectedRevision: string,
+  confirmation: string,
+) {
+  if (confirmation !== "REMOVE COMMENTS") {
+    throw new Error("Type REMOVE COMMENTS to confirm");
+  }
+  const current = await readSiteSettingsDocument(root);
+  if (current.revision !== expectedRevision) {
+    throw new Error(
+      "Site Settings changed outside the CMS; reload settings from file before removing Comments",
+    );
+  }
+  let disabled = current;
+  if (current.settings.comments?.enabled) {
+    disabled = await saveSiteSettings(
+      root,
+      siteSettingsSchema.parse({
+        ...current.settings,
+        comments: { ...current.settings.comments, enabled: false },
+      }),
+      expectedRevision,
+    );
+  }
+  let removedKeys: number;
+  try {
+    removedKeys = await removeCommentKeys(root);
+  } catch (caught) {
+    const reason =
+      caught instanceof Error ? caught.message : "Unexpected error";
+    throw new Error(
+      `Comments were disabled safely, but some Comment Keys remain. Reload Settings and retry full removal. ${reason}`,
+    );
+  }
+  if (!disabled.settings.comments) return { ...disabled, removedKeys };
+  const { comments: _comments, ...withoutComments } = disabled.settings;
+  try {
+    const saved = await saveSiteSettings(
+      root,
+      siteSettingsSchema.parse(withoutComments),
+      disabled.revision,
+    );
+    return { ...saved, removedKeys };
+  } catch (caught) {
+    const reason =
+      caught instanceof Error ? caught.message : "Unexpected error";
+    throw new Error(
+      `Comments are disabled and Comment Keys were removed, but setup remains. Reload Settings and retry full removal. ${reason}`,
+    );
+  }
 }

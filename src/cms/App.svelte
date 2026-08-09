@@ -7,7 +7,7 @@
   } from "../lib/presentation";
   import { siteSettingsSchema } from "../lib/schema";
   import { socialIconNames } from "../lib/social-icon-names";
-  import { api, type ImageImportProgress } from "./api";
+  import { api, type GiscusCategory, type ImageImportProgress } from "./api";
   import MediaGallery from "./MediaGallery.svelte";
   import type { MediaAsset, PostDocument, SiteSettings } from "./types";
   import VisualEditor, { type VisualInsertion } from "./VisualEditor.svelte";
@@ -77,6 +77,22 @@
   let discardPostDialog = $state<HTMLDialogElement>();
   let discardSettingsDialog = $state<HTMLDialogElement>();
   let deletePostDialog = $state<HTMLDialogElement>();
+  let removeCommentsDialog = $state<HTMLDialogElement>();
+  let commentsSetupOpen = $state(false);
+  let commentRepository = $state("");
+  let commentCategories = $state<GiscusCategory[]>([]);
+  let commentCategoryId = $state("");
+  let commentRepositoryId = $state("");
+  let commentSetupError = $state("");
+  let commentScript = $state("");
+  let discoveringComments = $state(false);
+  let parsingComments = $state(false);
+  let missingCommentKeys = $state<number | null>(null);
+  let removeCommentsConfirmation = $state("");
+  let removingComments = $state(false);
+  let openingDiscussion = $state(false);
+  let testingComments = $state(false);
+  let commentConnectionStatus = $state("");
   let libraryFile: File | null = $state(null);
   let libraryFileInput = $state<HTMLInputElement>();
   let libraryImportPhase: ImageImportPhase = $state("idle");
@@ -204,6 +220,14 @@
   let settingsValidation = $derived(
     settings ? siteSettingsSchema.safeParse(settings) : null,
   );
+  let commentsCanonicalOrigin = $derived.by(() => {
+    try {
+      const url = new URL(settings?.domain ?? "");
+      return url.protocol === "https:" ? url.origin : null;
+    } catch {
+      return null;
+    }
+  });
   let settingsErrors = $derived.by(() => {
     const errors: Record<string, string> = {};
     if (
@@ -1349,6 +1373,190 @@
     }
   }
 
+  async function countMissingCommentKeys() {
+    try {
+      missingCommentKeys = (await api.missingCommentKeys()).count;
+    } catch {
+      missingCommentKeys = null;
+    }
+  }
+
+  function beginCommentsSetup() {
+    commentsSetupOpen = true;
+    commentRepository = settings?.comments?.repository ?? "";
+    commentCategories = [];
+    commentCategoryId = "";
+    commentRepositoryId = "";
+    commentSetupError = "";
+    commentConnectionStatus = "";
+    void countMissingCommentKeys();
+  }
+
+  function useCommentsCategory(categoryId = commentCategoryId) {
+    if (!settings) return;
+    const category = commentCategories.find((item) => item.id === categoryId);
+    if (!category) {
+      commentSetupError = "Choose a Discussion category.";
+      return;
+    }
+    settings.comments = {
+      provider: "giscus",
+      enabled: settings.comments?.enabled ?? true,
+      repository: commentRepository.trim(),
+      repositoryId: commentRepositoryId,
+      category: category.name,
+      categoryId: category.id,
+      requireConsent: settings.comments?.requireConsent ?? true,
+      lazy: settings.comments?.lazy ?? true,
+      reactions: settings.comments?.reactions ?? true,
+      inputPosition: settings.comments?.inputPosition ?? "bottom",
+    };
+    commentsSetupOpen = false;
+    commentSetupError = "";
+    commentConnectionStatus = "";
+  }
+
+  async function discoverComments() {
+    if (!commentRepository.trim() || discoveringComments) return;
+    discoveringComments = true;
+    commentSetupError = "";
+    try {
+      const result = await api.discoverComments(commentRepository.trim());
+      commentRepository = result.repository;
+      commentRepositoryId = result.repositoryId;
+      commentCategories = result.categories;
+      commentCategoryId = result.selectedCategory?.id ?? "";
+      if (result.selectedCategory)
+        useCommentsCategory(result.selectedCategory.id);
+    } catch (caught) {
+      commentSetupError = message(caught);
+    } finally {
+      discoveringComments = false;
+    }
+  }
+
+  async function parseCommentsScript() {
+    if (!commentScript.trim() || parsingComments || !settings) return;
+    parsingComments = true;
+    commentSetupError = "";
+    try {
+      const parsed = await api.parseCommentsScript(commentScript);
+      settings.comments = {
+        ...parsed,
+        enabled: settings.comments?.enabled ?? true,
+      };
+      commentRepository = parsed.repository;
+      commentsSetupOpen = false;
+      commentScript = "";
+      commentConnectionStatus = "";
+      void countMissingCommentKeys();
+    } catch (caught) {
+      commentSetupError = message(caught);
+    } finally {
+      parsingComments = false;
+    }
+  }
+
+  async function testCommentsConnection() {
+    if (!settings?.comments || testingComments) return;
+    testingComments = true;
+    commentConnectionStatus = "";
+    try {
+      const result = await api.discoverComments(settings.comments.repository);
+      const category = result.categories.find(
+        (item) => item.id === settings?.comments?.categoryId,
+      );
+      if (result.repositoryId !== settings.comments.repositoryId || !category) {
+        throw new Error("Saved repository or category IDs no longer match.");
+      }
+      commentConnectionStatus = "Connection successful.";
+    } catch (caught) {
+      commentConnectionStatus = `Connection failed: ${message(caught)}`;
+    } finally {
+      testingComments = false;
+    }
+  }
+
+  function setCommentsEnabled(enabled: boolean) {
+    if (!settings?.comments) {
+      if (enabled) beginCommentsSetup();
+      return;
+    }
+    settings.comments.enabled = enabled;
+    if (enabled) void countMissingCommentKeys();
+  }
+
+  function openRemoveCommentsDialog() {
+    if (settingsDirty || busy) return;
+    removeCommentsConfirmation = "";
+    removeCommentsDialog?.showModal();
+    queueMicrotask(() =>
+      removeCommentsDialog
+        ?.querySelector<HTMLButtonElement>("[data-cancel]")
+        ?.focus(),
+    );
+  }
+
+  async function removeCommentsSetup() {
+    if (removeCommentsConfirmation !== "REMOVE COMMENTS" || removingComments)
+      return;
+    removingComments = true;
+    error = "";
+    try {
+      const result = await api.removeCommentsSetup(
+        settingsRevision,
+        removeCommentsConfirmation,
+      );
+      settings = result.settings;
+      savedSettings = cloneSettings(result.settings);
+      settingsRevision = result.settingsRevision;
+      commentsSetupOpen = false;
+      removeCommentsDialog?.close();
+      showNotice(
+        `Comments setup removed. ${result.removedKeys} Comment ${result.removedKeys === 1 ? "Key" : "Keys"} deleted.`,
+      );
+      changed = (await api.changed()).changed;
+    } catch (caught) {
+      const failure = message(caught);
+      error = failure;
+      if (/Comments (?:were|are) disabled/.test(failure)) {
+        try {
+          const result = await api.settings();
+          settings = result.settings;
+          savedSettings = cloneSettings(result.settings);
+          settingsRevision = result.settingsRevision;
+          settingsConflict = false;
+          settingsValidationAttempted = false;
+        } catch {
+          // Keep the recovery instruction from the original failure.
+        }
+      }
+    } finally {
+      removingComments = false;
+    }
+  }
+
+  async function openCommentDiscussion() {
+    if (!selected || openingDiscussion) return;
+    const popup = window.open("about:blank", "_blank");
+    if (popup) popup.opener = null;
+    openingDiscussion = true;
+    error = "";
+    try {
+      const result = await api.commentDiscussion(selected.folder);
+      const discussions = `https://github.com/${settings?.comments?.repository}/discussions`;
+      if (popup) popup.location.href = result.url ?? discussions;
+      if (!result.url)
+        showNotice("No Discussion exists yet. Opened repository Discussions.");
+    } catch (caught) {
+      const fallback = `https://github.com/${settings?.comments?.repository}/discussions?discussions_q=${encodeURIComponent(selected.commentKey ?? selected.title)}`;
+      if (popup) popup.location.href = fallback;
+      error = `${message(caught)} Opened a Comment Key search instead.`;
+    } finally {
+      openingDiscussion = false;
+    }
+  }
+
   function openDiscardSettingsDialog() {
     if (!settingsDirty || busy || settingsConflict) return;
     discardSettingsDialog?.showModal();
@@ -1766,6 +1974,17 @@
                 {#if viewPostHref}
                   <a href={viewPostHref} target="_blank">View post</a>
                 {/if}
+                {#if !creatingPost && settings?.comments && selected.commentKey}
+                  <button
+                    type="button"
+                    class="secondary-action"
+                    disabled={openingDiscussion || busy}
+                    onclick={openCommentDiscussion}
+                    >{openingDiscussion
+                      ? "Opening…"
+                      : "Manage discussion"}</button
+                  >
+                {/if}
                 <div class="publication-control">
                   <fieldset
                     class="publication-state"
@@ -1867,6 +2086,12 @@
                     <p class="danger-note">
                       After deployment, <code>/posts/{selected.slug}/</code> will
                       return a 404 page.
+                    </p>
+                  {/if}
+                  {#if selected.commentKey && settings?.comments}
+                    <p class="danger-note">
+                      Its GitHub Discussion is not deleted. Remove or lock it on
+                      GitHub if needed.
                     </p>
                   {/if}
                   {#if dirty}
@@ -3025,6 +3250,241 @@
             {/if}
           </section>
           <section>
+            <h2>Comments</h2>
+            <p class="settings-section-description">
+              Optional public comments powered by GitHub Discussions and
+              <a href="https://giscus.app/" target="_blank" rel="noreferrer"
+                >giscus</a
+              >. Disabled sites publish no Comments code or requests.
+            </p>
+            <label class="check comments-toggle"
+              ><input
+                type="checkbox"
+                checked={settings.comments?.enabled ?? false}
+                onchange={(event) =>
+                  setCommentsEnabled(event.currentTarget.checked)}
+              /> Enable comments</label
+            >
+            {#if settings.comments}
+              <div class="comments-summary">
+                <strong>{settings.comments.repository}</strong>
+                <span>{settings.comments.category} Discussions</span>
+              </div>
+              {#if !settings.comments.enabled}
+                <small class="field-help">
+                  Configuration and Comment Keys are preserved. Existing GitHub
+                  Discussions are unchanged.
+                </small>
+              {/if}
+              {#if settings.comments.enabled && missingCommentKeys}
+                <p class="setup-note">
+                  Saving will add immutable Comment Keys to
+                  {missingCommentKeys} published
+                  {missingCommentKeys === 1 ? " Post" : " Posts"}.
+                </p>
+              {/if}
+              <label class="check"
+                ><input
+                  type="checkbox"
+                  bind:checked={settings.comments.requireConsent}
+                /> Ask readers before loading GitHub content</label
+              >
+              <small class="field-help">
+                Recommended. Readers can also choose “Always load comments on
+                this site.”
+              </small>
+              <label class="check"
+                ><input type="checkbox" bind:checked={settings.comments.lazy} /> Lazy-load
+                the comments frame</label
+              >
+              <label class="check"
+                ><input
+                  type="checkbox"
+                  bind:checked={settings.comments.reactions}
+                /> Show reactions above comments</label
+              >
+              <label
+                >Comment box position
+                <select bind:value={settings.comments.inputPosition}>
+                  <option value="bottom">Below comments</option>
+                  <option value="top">Above comments</option>
+                </select></label
+              >
+              <div class="comments-actions">
+                <button type="button" onclick={beginCommentsSetup}
+                  >Change repository</button
+                >
+                <button
+                  type="button"
+                  disabled={testingComments}
+                  onclick={testCommentsConnection}
+                  >{testingComments ? "Testing…" : "Test connection"}</button
+                >
+                <a
+                  href={`https://github.com/${settings.comments.repository}/discussions`}
+                  target="_blank"
+                  rel="noreferrer">Open Discussions</a
+                >
+              </div>
+              {#if commentConnectionStatus}
+                <p class="field-help" role="status">
+                  {commentConnectionStatus}
+                </p>
+              {/if}
+              {#if savedSettings && settings.domain !== savedSettings.domain}
+                <p class="setup-note">
+                  Canonical domain changed. Update <code>giscus.json</code> in the
+                  Comments repository after saving.
+                </p>
+              {/if}
+              <details>
+                <summary>Optional giscus.json origin restriction</summary>
+                <p class="field-help">
+                  Add this file to the Comments repository root to restrict
+                  which site may use it.
+                </p>
+                {#if commentsCanonicalOrigin}
+                  <pre>{JSON.stringify(
+                      {
+                        origins: [commentsCanonicalOrigin],
+                        originsRegex: [
+                          "^http://localhost:[0-9]+$",
+                          "^http://127\\.0\\.0\\.1:[0-9]+$",
+                        ],
+                        defaultCommentOrder: "oldest",
+                      },
+                      null,
+                      2,
+                    )}</pre>
+                  <small class="field-help">
+                    Localhost is included so the development preview can load
+                    comments.
+                  </small>
+                {:else}
+                  <small class="field-error" role="alert">
+                    Enter a valid HTTPS Canonical domain to generate this file.
+                  </small>
+                {/if}
+              </details>
+              <button
+                type="button"
+                class="destructive-outline"
+                disabled={settingsDirty || busy}
+                onclick={openRemoveCommentsDialog}>Remove Comments setup</button
+              >
+              {#if settingsDirty}
+                <small class="field-help">
+                  Save or discard other Settings changes before full removal.
+                </small>
+              {/if}
+            {/if}
+
+            {#if commentsSetupOpen}
+              <div class="comments-setup" aria-label="Comments setup">
+                <h3>Connect a GitHub repository</h3>
+                <p>
+                  Use any public repository you own. Enable Discussions and
+                  install the giscus app for that repository first.
+                </p>
+                {#if settings.comments}
+                  <p class="setup-note">
+                    Changing repository does not move existing Discussions.
+                    Posts will look for their Comment Keys in the new
+                    repository.
+                  </p>
+                {/if}
+                <div class="setup-links">
+                  <a
+                    href="https://github.com/new"
+                    target="_blank"
+                    rel="noreferrer">Create a public repository</a
+                  >
+                  <a
+                    href="https://github.com/apps/giscus/installations/new"
+                    target="_blank"
+                    rel="noreferrer">Install giscus</a
+                  >
+                  <a
+                    href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository#enabling-or-disabling-github-discussions-for-a-repository"
+                    target="_blank"
+                    rel="noreferrer">Enable Discussions</a
+                  >
+                </div>
+                <button
+                  type="button"
+                  class="quiet"
+                  onclick={() => (commentsSetupOpen = false)}
+                  >Cancel setup</button
+                >
+                <label
+                  >Repository
+                  <input
+                    placeholder="owner/repository"
+                    autocomplete="off"
+                    value={commentRepository}
+                    oninput={(event) => {
+                      commentRepository = event.currentTarget.value;
+                      commentCategories = [];
+                      commentCategoryId = "";
+                      commentRepositoryId = "";
+                    }}
+                  /></label
+                >
+                <button
+                  type="button"
+                  class="primary"
+                  disabled={!commentRepository.trim() || discoveringComments}
+                  onclick={discoverComments}
+                  >{discoveringComments
+                    ? "Checking…"
+                    : "Connect repository"}</button
+                >
+                {#if commentCategories.length}
+                  <label
+                    >Discussion category
+                    <select bind:value={commentCategoryId}>
+                      <option value="">Choose a category</option>
+                      {#each commentCategories as category (category.id)}
+                        <option value={category.id}>{category.name}</option>
+                      {/each}
+                    </select></label
+                  >
+                  <button
+                    type="button"
+                    disabled={!commentCategoryId}
+                    onclick={() => useCommentsCategory()}>Use category</button
+                  >
+                {/if}
+                {#if commentSetupError}
+                  <p class="field-error" role="alert">{commentSetupError}</p>
+                {/if}
+                <details>
+                  <summary>Repository lookup not working?</summary>
+                  <p class="field-help">
+                    Configure giscus at giscus.app, then paste its generated
+                    script here. Only official giscus.app scripts are accepted.
+                  </p>
+                  <textarea
+                    rows="7"
+                    spellcheck="false"
+                    placeholder="Paste the generated giscus embed code"
+                    bind:value={commentScript}></textarea>
+                  <button
+                    type="button"
+                    disabled={!commentScript.trim() || parsingComments}
+                    onclick={parseCommentsScript}
+                    >{parsingComments ? "Reading…" : "Use pasted setup"}</button
+                  >
+                </details>
+              </div>
+            {:else if !settings.comments}
+              <small class="field-help">
+                Turning this on starts setup. Nothing changes on the Published
+                Site until setup is saved.
+              </small>
+            {/if}
+          </section>
+          <section>
             <h2>Robots and discovery</h2>
             <p class="settings-section-description">
               Control search indexing, link following, and AI-training
@@ -3081,6 +3541,45 @@
             <pre>{robotsText(settings)}</pre>
           </section>
         </div>
+        <dialog
+          class="confirm-dialog"
+          aria-labelledby="remove-comments-title"
+          aria-describedby="remove-comments-description"
+          bind:this={removeCommentsDialog}
+        >
+          <h2 id="remove-comments-title">Remove Comments setup?</h2>
+          <div id="remove-comments-description">
+            <p>
+              This removes the giscus configuration and every immutable Comment
+              Key from local Post files. Existing GitHub Discussions remain.
+            </p>
+            <p class="danger-note">
+              Reconnecting later creates new Discussion mappings.
+            </p>
+          </div>
+          <label
+            >Type <code>REMOVE COMMENTS</code> to confirm
+            <input autocomplete="off" bind:value={removeCommentsConfirmation} />
+          </label>
+          <div class="confirm-actions">
+            <button
+              type="button"
+              data-cancel
+              disabled={removingComments}
+              onclick={() => removeCommentsDialog?.close()}>Cancel</button
+            >
+            <button
+              type="button"
+              class="destructive"
+              disabled={removeCommentsConfirmation !== "REMOVE COMMENTS" ||
+                removingComments}
+              onclick={removeCommentsSetup}
+              >{removingComments
+                ? "Removing…"
+                : "Remove Comments setup"}</button
+            >
+          </div>
+        </dialog>
         <dialog
           class="media-dialog"
           aria-labelledby="default-social-dialog-title"
@@ -4223,6 +4722,58 @@
     color: var(--muted);
     font-size: 0.85rem;
     line-height: 1.45;
+  }
+  .comments-toggle {
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    font-weight: 650;
+  }
+  .comments-summary {
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.8rem;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .comments-summary span,
+  .comments-setup p {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .comments-actions,
+  .setup-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.7rem;
+  }
+  .comments-actions a,
+  .setup-links a {
+    color: var(--accent);
+  }
+  .comments-setup {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.9rem;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .comments-setup h3,
+  .comments-setup p {
+    margin: 0;
+  }
+  .setup-note {
+    margin: 0;
+    padding: 0.7rem;
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+    background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+    font-size: 0.85rem;
+  }
+  .destructive-outline {
+    color: var(--danger);
+    border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+    background: transparent;
   }
   .settings-validation-summary {
     margin: 0 0 1rem;

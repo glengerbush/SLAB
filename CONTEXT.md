@@ -83,3 +83,27 @@ _Avoid_: Cover image, generated card, thumbnail
 **Custom Content**:
 Trusted, Author-controlled Post material outside the standard set of prose, images, links, and code examples.
 _Avoid_: Plugin content, rich block
+
+**Comment Repository**:
+A public GitHub repository owned by the Author where reader conversations are stored. It may be otherwise unrelated to the Blog and may serve other uses.
+_Avoid_: Dedicated comments repository, Blog source repository
+
+**Comment Configuration**:
+The saved connection between the Blog and its Comment Repository. It may remain saved while Comments are disabled.
+_Avoid_: Giscus script, installation
+
+**Comments**:
+Reader conversations attached to every Published Post when enabled for the Blog; they do not appear on Pages, indexes, Drafts, or Local CMS previews.
+_Avoid_: Feedback, replies, annotations
+
+**Locked Discussion**:
+A Post's GitHub Discussion after a moderator prevents new reader contributions; this is the sole per-Post control for Comments.
+_Avoid_: Comments override, comments-disabled Post
+
+**Comment Key**:
+An immutable, human-readable identifier derived from a Post title plus a unique suffix when that Post first becomes eligible for Comments. It initially names the Post's GitHub Discussion, survives Comments being disabled, and is deleted only by Comments Removal.
+_Avoid_: Post title, Slug, URL
+
+**Comments Removal**:
+The deliberate deletion of Comment Configuration and every Comment Key from the Blog; it does not delete the external Comment Repository or its Discussions.
+_Avoid_: Disable comments, uninstall GitHub App

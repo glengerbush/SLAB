@@ -1,0 +1,146 @@
+---
+import type { SiteSettings } from "../lib/schema";
+import { giscusLanguage } from "../lib/giscus";
+
+interface Props {
+  config: NonNullable<SiteSettings["comments"]>;
+  commentKey: string;
+  locale: string;
+}
+
+const { config, commentKey, locale } = Astro.props;
+const language = giscusLanguage(locale);
+const repositoryUrl = `https://github.com/${config.repository}/discussions`;
+---
+
+<section
+  class="comments"
+  aria-labelledby="comments-heading"
+  data-repo={config.repository}
+  data-repo-id={config.repositoryId}
+  data-category={config.category}
+  data-category-id={config.categoryId}
+  data-term={commentKey}
+  data-lang={language}
+  data-lazy={config.lazy ? "lazy" : "eager"}
+  data-reactions={config.reactions ? "1" : "0"}
+  data-input-position={config.inputPosition}
+  data-require-consent={config.requireConsent ? "true" : "false"}
+>
+  <h2 id="comments-heading">Comments</h2>
+  <div class="comments-consent">
+    <button
+      type="button"
+      data-load-comments
+      aria-describedby="comments-disclosure">Show comments</button
+    >
+    <p id="comments-disclosure">
+      via GitHub; account required to join.
+      {" "}
+      <a href="https://github.com/giscus/giscus/blob/main/PRIVACY-POLICY.md">
+        Privacy
+      </a>
+    </p>
+    <label>
+      <input type="checkbox" data-always-load /> Always show
+    </label>
+  </div>
+  <div class="comments-status" role="status" aria-live="polite"></div>
+  <div class="comments-frame"></div>
+  <div class="comments-failure" hidden>
+    <p>
+      Comments are unavailable. You can still
+      <a href={repositoryUrl}>view Discussions on GitHub</a>.
+    </p>
+    <button type="button" data-retry-comments> Try again </button>
+  </div>
+</section>
+
+<script is:inline src="/comments.js" data-comments-client></script>
+
+<style is:inline>
+  .comments {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+  .comments h2 {
+    margin: 0 0 0.75rem;
+  }
+  .comments-consent {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.8rem;
+    padding-block: 0 0.65rem;
+  }
+  .comments-failure:not([hidden]) {
+    display: grid;
+    gap: 0.8rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.35rem;
+    background: var(--surface);
+  }
+  .comments-failure p {
+    margin: 0;
+  }
+  .comments-consent p {
+    flex: 1 1 14rem;
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+  .comments-status {
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+  .comments-consent label {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+  .comments-consent button {
+    width: fit-content;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 0.3rem;
+    color: var(--text);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.875rem;
+  }
+  .comments-consent button:hover {
+    border-color: var(--accent);
+    color: var(--link);
+  }
+  .comments-failure button {
+    width: fit-content;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 0.35rem;
+    color: var(--text);
+    background: var(--background);
+    cursor: pointer;
+    font: inherit;
+  }
+  .comments-failure button:hover {
+    background: color-mix(in srgb, var(--accent) 12%, var(--background));
+  }
+  .comments-consent input {
+    accent-color: var(--accent);
+  }
+  .comments-status:not(:empty) {
+    padding-block: 0.75rem;
+  }
+  .comments-frame {
+    min-width: 0;
+  }
+  .comments-frame iframe {
+    color-scheme: normal;
+  }
+</style>

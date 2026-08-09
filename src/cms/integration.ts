@@ -21,6 +21,12 @@ import {
 import { deletePersistedPostMedia } from "./media-deletion";
 import { deletePersistedPost } from "./post-deletion";
 import {
+  countMissingCommentKeys,
+  discoverGiscusRepository,
+  parseGiscusScript,
+  resolveGiscusDiscussion,
+} from "./comments";
+import {
   createPost,
   listPostDocuments,
   readPost,
@@ -32,6 +38,7 @@ import {
 import {
   readSiteSettings,
   readSiteSettingsDocument,
+  removeCommentsSetup,
   saveSiteSettings,
 } from "./settings";
 import { robotsText } from "../lib/presentation";
@@ -218,12 +225,15 @@ export function localCms(): AstroIntegration {
               request.method === "POST" &&
               requestUrl.pathname === `${apiPrefix}/posts`
             ) {
+              const settings = await readSiteSettings(root);
               return json(
                 response,
                 201,
                 await createPost(
                   root,
                   (await body(request, 100_000)) as CreatePostInput,
+                  new Date(),
+                  settings.comments?.enabled === true,
                 ),
               );
             }
@@ -240,6 +250,8 @@ export function localCms(): AstroIntegration {
                 {
                   expectedRevision: input.expectedRevision,
                   confirmSlugChange: input.confirmSlugChange,
+                  commentsEnabled:
+                    (await readSiteSettings(root)).comments?.enabled === true,
                 },
               );
               return json(response, 200, saved);
@@ -323,6 +335,74 @@ export function localCms(): AstroIntegration {
                 settings: document.settings,
                 settingsRevision: document.revision,
                 robots: robotsText(document.settings),
+              });
+            }
+            if (
+              request.method === "GET" &&
+              requestUrl.pathname === `${apiPrefix}/comments/discover`
+            ) {
+              return json(
+                response,
+                200,
+                await discoverGiscusRepository(
+                  requestUrl.searchParams.get("repository") ?? "",
+                ),
+              );
+            }
+            if (
+              request.method === "POST" &&
+              requestUrl.pathname === `${apiPrefix}/comments/parse`
+            ) {
+              const input = (await body(request, 30_000)) as {
+                script: string;
+              };
+              return json(response, 200, parseGiscusScript(input.script));
+            }
+            if (
+              request.method === "GET" &&
+              requestUrl.pathname === `${apiPrefix}/comments/missing`
+            ) {
+              return json(response, 200, {
+                count: await countMissingCommentKeys(root),
+              });
+            }
+            if (
+              request.method === "DELETE" &&
+              requestUrl.pathname === `${apiPrefix}/comments/setup`
+            ) {
+              const input = (await body(request, 10_000)) as {
+                expectedRevision: string;
+                confirmation: string;
+              };
+              const removed = await removeCommentsSetup(
+                root,
+                input.expectedRevision,
+                input.confirmation,
+              );
+              return json(response, 200, {
+                settings: removed.settings,
+                settingsRevision: removed.revision,
+                removedKeys: removed.removedKeys,
+              });
+            }
+            if (
+              request.method === "GET" &&
+              requestUrl.pathname === `${apiPrefix}/comments/discussion`
+            ) {
+              const folder = requestUrl.searchParams.get("folder") ?? "";
+              const [settings, post] = await Promise.all([
+                readSiteSettings(root),
+                readPost(root, folder),
+              ]);
+              if (!settings.comments || !post.commentKey) {
+                throw new Error("This Post has no Comment Discussion");
+              }
+              return json(response, 200, {
+                url: await resolveGiscusDiscussion(
+                  settings.comments.repository,
+                  settings.comments.category,
+                  post.commentKey,
+                ),
               });
             }
             const libraryDeleteRoute = requestUrl.pathname.match(

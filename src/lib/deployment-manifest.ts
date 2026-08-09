@@ -92,7 +92,7 @@ async function publishedPosts(root: string): Promise<PublishedPostOutput[]> {
 function linkedGeneratedFiles(source: string, from: string) {
   const files = new Set<string>();
   for (const match of source.matchAll(
-    /\/(?:_astro\/[a-z0-9._~/-]+|media\/shared\/[a-z0-9][a-z0-9.-]*\.(?:avif|svg))/gi,
+    /\/(?:comments\.js|_astro\/[a-z0-9._~/-]+|media\/shared\/[a-z0-9][a-z0-9.-]*\.(?:avif|svg))/gi,
   )) {
     files.add(match[0].slice(1).split(/[?#]/, 1)[0]);
   }

@@ -1,5 +1,6 @@
 ---
 import SiteLayout from "../../layouts/SiteLayout.astro";
+import Comments from "../../components/Comments.astro";
 import { adjacentPosts, loadSite, tagSlug, type Post } from "../../lib/content";
 import { renderMarkdown } from "../../lib/markdown";
 import { formatDate } from "../../lib/presentation";
@@ -90,6 +91,15 @@ if (import.meta.env.DEV) {
               ))}
             </ul>
           </section>
+        )
+      }
+      {
+        settings.comments?.enabled && post.commentKey && (
+          <Comments
+            config={settings.comments}
+            commentKey={post.commentKey}
+            locale={settings.locale}
+          />
         )
       }
       {

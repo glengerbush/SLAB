@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import matter from "gray-matter";
 import YAML from "yaml";
@@ -43,8 +43,10 @@ async function generatedFiles(directory) {
 }
 
 const sharedReferences = new Set();
+let commentsClientReferenced = false;
 for (const file of await generatedFiles(dist)) {
   const source = await readFile(file, "utf8");
+  if (source.includes('src="/comments.js"')) commentsClientReferenced = true;
   for (const match of source.matchAll(
     /\/media\/shared\/([a-z0-9][a-z0-9.-]*\.(?:avif|svg))/gi,
   ))
@@ -63,7 +65,13 @@ const frameOrigins = (settings.frames ?? []).map(
 const frameSource = frameOrigins.length
   ? ` 'self' ${frameOrigins.join(" ")}`
   : " 'self'";
-const csp = `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src${frameSource}; connect-src 'self'`;
+const commentsEnabled =
+  settings.comments?.enabled === true && commentsClientReferenced;
+if (!commentsEnabled) await rm(resolve(dist, "comments.js"), { force: true });
+const scriptSource = commentsEnabled ? " 'self' https://giscus.app" : " 'self'";
+const commentsFrameSource = commentsEnabled ? " https://giscus.app" : "";
+const commentsStyleSource = commentsEnabled ? " https://giscus.app" : "";
+const csp = `default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'${commentsStyleSource}; script-src${scriptSource}; frame-src${frameSource}${commentsFrameSource}; connect-src 'self'`;
 await writeFile(resolve(dist, "_redirects"), `${redirects.join("\n")}\n`);
 await writeFile(
   resolve(dist, "_headers"),

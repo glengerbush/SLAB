@@ -63,6 +63,38 @@ const hexColor = z
   .regex(/^#[0-9a-fA-F]{6}$/, "Use a six-digit hex color")
   .transform((value) => value.toUpperCase());
 
+export const commentKeySchema = z
+  .string()
+  .trim()
+  .min(16)
+  .max(240)
+  .regex(/^.+ \[[a-f0-9]{12}\]$/, "Use a generated Comment Key");
+
+export const commentConfigurationSchema = z.object({
+  provider: z.literal("giscus"),
+  enabled: z.boolean(),
+  repository: z
+    .string()
+    .trim()
+    .regex(
+      /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/,
+      "Use owner/repository",
+    ),
+  repositoryId: z
+    .string()
+    .trim()
+    .regex(/^R_[A-Za-z0-9_-]{4,98}$/, "Use a GitHub repository ID"),
+  category: z.string().trim().min(1).max(100),
+  categoryId: z
+    .string()
+    .trim()
+    .regex(/^DIC_[A-Za-z0-9_-]{4,96}$/, "Use a Discussion category ID"),
+  requireConsent: z.boolean().default(true),
+  lazy: z.boolean().default(true),
+  reactions: z.boolean().default(true),
+  inputPosition: z.enum(["top", "bottom"]).default("bottom"),
+});
+
 export const postDataSchema = z
   .object({
     title: z.string().trim().min(1).max(180),
@@ -77,6 +109,7 @@ export const postDataSchema = z
       .default([]),
     aliases: z.array(slugSchema).default([]),
     socialImage: mediaPath.default(null),
+    commentKey: commentKeySchema.optional(),
   })
   .superRefine((value, context) => {
     if (!value.draft && !value.published) {
@@ -173,6 +206,7 @@ export const siteSettingsSchema = z.object({
         ),
     )
     .max(30),
+  comments: commentConfigurationSchema.optional(),
 });
 
 export type PostData = z.infer<typeof postDataSchema>;

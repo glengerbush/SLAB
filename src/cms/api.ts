@@ -20,6 +20,13 @@ interface SyncResult {
   revision: string | null;
 }
 
+export interface GiscusCategory {
+  id: string;
+  name: string;
+  emoji?: string;
+  description?: string;
+}
+
 type ImageStreamMessage<T> =
   | { type: "progress"; percent: number }
   | ({ type: "result" } & T)
@@ -175,6 +182,32 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ settings, expectedRevision }),
     }),
+  discoverComments: (repository: string) =>
+    request<{
+      repository: string;
+      repositoryId: string;
+      categories: GiscusCategory[];
+      selectedCategory: GiscusCategory | null;
+    }>(`/comments/discover?repository=${encodeURIComponent(repository)}`),
+  parseCommentsScript: (script: string) =>
+    request<NonNullable<SiteSettings["comments"]>>("/comments/parse", {
+      method: "POST",
+      body: JSON.stringify({ script }),
+    }),
+  missingCommentKeys: () => request<{ count: number }>("/comments/missing"),
+  removeCommentsSetup: (expectedRevision: string, confirmation: string) =>
+    request<{
+      settings: SiteSettings;
+      settingsRevision: string;
+      removedKeys: number;
+    }>("/comments/setup", {
+      method: "DELETE",
+      body: JSON.stringify({ expectedRevision, confirmation }),
+    }),
+  commentDiscussion: (folder: string) =>
+    request<{ url: string | null }>(
+      `/comments/discussion?folder=${encodeURIComponent(folder)}`,
+    ),
   media: (folder: string) =>
     request<MediaAsset[]>(`/media/${encodeURIComponent(folder)}`),
   insertMedia: (
