@@ -1,0 +1,23 @@
+title: Example Blog
+description: A small, durable blog made from plain files.
+author: Example Author
+domain: https://example.com
+locale: en-US
+accentColor: "#33D17A"
+navigation:
+  - label: Posts
+    href: /
+  - label: Tags
+    href: /tags/
+  - label: About
+    href: /about/
+  - label: RSS
+    href: /rss.xml
+socialLinks: []
+defaultSocialImage: null
+robots:
+  index: true
+  follow: true
+  allowAiTraining: false
+  advancedRules: ""
+frames: []

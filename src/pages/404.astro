@@ -1,0 +1,12 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { loadSite } from "../lib/content";
+const { settings } = await loadSite();
+---
+
+<SiteLayout settings={settings} title="Not found" path="/404.html">
+  <article class="prose">
+    <h1>Page not found</h1>
+    <p>The page may have moved. Try the <a href="/">post index</a>.</p>
+  </article>
+</SiteLayout>

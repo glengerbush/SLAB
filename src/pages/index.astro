@@ -1,0 +1,14 @@
+---
+import PostList from "../components/PostList.astro";
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { loadSite } from "../lib/content";
+
+const { settings, posts } = await loadSite();
+---
+
+<SiteLayout settings={settings} path="/">
+  <section aria-label="Posts">
+    <h1>All posts</h1>
+    <PostList posts={posts} locale={settings.locale} />
+  </section>
+</SiteLayout>

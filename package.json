@@ -1,0 +1,54 @@
+{
+  "name": "slab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <27"
+  },
+  "scripts": {
+    "dev": "cross-env ASTRO_TELEMETRY_DISABLED=1 ASTRO_DEV_BACKGROUND=0 astro dev --host 127.0.0.1",
+    "build": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro build && node scripts/finalize-build.mjs && node scripts/audit-build.mjs",
+    "preview": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro preview --host 127.0.0.1",
+    "check": "cross-env ASTRO_TELEMETRY_DISABLED=1 astro check && svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@astrojs/rss": "^4.0.19",
+    "@astrojs/svelte": "^9.0.1",
+    "@tiptap/core": "^3.29.2",
+    "@tiptap/extension-image": "^3.29.2",
+    "@tiptap/markdown": "^3.29.2",
+    "@tiptap/starter-kit": "^3.29.2",
+    "astro": "^7.2.0",
+    "gray-matter": "^4.0.3",
+    "rehype-raw": "^7.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "sharp": "^0.35.3",
+    "shiki": "^4.4.2",
+    "simple-icons": "^16.27.1",
+    "svelte": "^5.56.8",
+    "unified": "^11.0.5",
+    "unist-util-visit": "^5.1.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.1.2",
+    "cross-env": "^10.1.0",
+    "prettier": "^3.9.6",
+    "prettier-plugin-astro": "^0.14.1",
+    "prettier-plugin-svelte": "^4.1.1",
+    "svelte-check": "^4.7.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10",
+    "yaml": "^2.9.0"
+  }
+}

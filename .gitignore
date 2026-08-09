@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.astro/
+.wrangler/
+playwright-report/
+.DS_Store
+*.log
+*.local.md

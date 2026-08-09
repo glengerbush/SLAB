@@ -1,0 +1,25 @@
+---
+import type { Post } from "../lib/content";
+import { formatDate } from "../lib/presentation";
+
+interface Props {
+  posts: Post[];
+  locale: string;
+}
+const { posts, locale } = Astro.props;
+---
+
+<ol class="post-list">
+  {
+    posts.map((post) => (
+      <li>
+        <a href={`/posts/${post.slug}/`}>
+          <time datetime={post.published}>
+            {formatDate(post.published!, locale)}
+          </time>
+          <span>{post.title}</span>
+        </a>
+      </li>
+    ))
+  }
+</ol>

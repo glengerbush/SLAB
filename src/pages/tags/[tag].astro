@@ -1,0 +1,41 @@
+---
+import PostList from "../../components/PostList.astro";
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import { loadSite, type Post } from "../../lib/content";
+import type { SiteSettings } from "../../lib/schema";
+
+export async function getStaticPaths() {
+  const site = await loadSite();
+  return [...site.tags.entries()].map(([slug, tag]) => ({
+    params: { tag: slug },
+    props: { ...tag, settings: site.settings },
+  }));
+}
+
+interface Props {
+  name: string;
+  posts: Post[];
+  settings: SiteSettings;
+}
+let { name, posts, settings } = Astro.props;
+if (import.meta.env.DEV) {
+  const live = await loadSite();
+  const liveTag = live.tags.get(Astro.params.tag!);
+  if (!liveTag) {
+    Astro.response.status = 404;
+    Astro.response.statusText = "Not found";
+    return Astro.rewrite("/404.html");
+  }
+  ({ name, posts } = liveTag);
+  settings = live.settings;
+}
+---
+
+<SiteLayout
+  settings={settings}
+  title={`Posts tagged ${name}`}
+  path={Astro.url.pathname}
+>
+  <h1>Posts tagged “{name}”</h1>
+  <PostList posts={posts} locale={settings.locale} />
+</SiteLayout>

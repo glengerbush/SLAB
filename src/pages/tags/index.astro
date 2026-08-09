@@ -1,0 +1,29 @@
+---
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import { loadSite } from "../../lib/content";
+
+const { settings, tags } = await loadSite();
+const collator = new Intl.Collator(settings.locale, { sensitivity: "base" });
+const sortedTags = [...tags.entries()].sort(([, first], [, second]) =>
+  collator.compare(first.name, second.name),
+);
+---
+
+<SiteLayout settings={settings} title="Tags" path="/tags/">
+  <section aria-labelledby="tags-title">
+    <h1 id="tags-title">Tags</h1>
+    {
+      sortedTags.length > 0 ? (
+        <ul class="tags">
+          {sortedTags.map(([slug, tag]) => (
+            <li>
+              <a href={`/tags/${slug}/`}>{tag.name}</a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No tags yet.</p>
+      )
+    }
+  </section>
+</SiteLayout>

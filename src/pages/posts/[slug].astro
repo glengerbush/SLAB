@@ -1,0 +1,133 @@
+---
+import SiteLayout from "../../layouts/SiteLayout.astro";
+import { adjacentPosts, loadSite, tagSlug, type Post } from "../../lib/content";
+import { renderMarkdown } from "../../lib/markdown";
+import { formatDate } from "../../lib/presentation";
+import type { SiteSettings } from "../../lib/schema";
+
+export async function getStaticPaths() {
+  const site = await loadSite();
+  return site.posts.map((post) => {
+    const { previous, next } = adjacentPosts(site.posts, post.slug);
+    return {
+      params: { slug: post.slug },
+      props: {
+        post,
+        settings: site.settings,
+        previousPost: previous,
+        nextPost: next,
+      },
+    };
+  });
+}
+
+interface Props {
+  post: Post;
+  settings: SiteSettings;
+  previousPost?: Post;
+  nextPost?: Post;
+}
+let { post, settings, previousPost, nextPost } = Astro.props;
+if (import.meta.env.DEV) {
+  const live = await loadSite();
+  const livePost = live.posts.find(
+    (candidate) => candidate.slug === Astro.params.slug,
+  );
+  if (!livePost) {
+    Astro.response.status = 404;
+    Astro.response.statusText = "Not found";
+    return Astro.rewrite("/404.html");
+  }
+  post = {
+    ...livePost,
+    html: await renderMarkdown(livePost.body, { localCmsLinks: true }),
+  };
+  settings = live.settings;
+  const adjacent = adjacentPosts(live.posts, livePost.slug);
+  previousPost = adjacent.previous;
+  nextPost = adjacent.next;
+}
+---
+
+<SiteLayout
+  settings={settings}
+  title={post.title}
+  description={post.description}
+  path={`/posts/${post.slug}/`}
+  socialImage={post.socialImage}
+  type="article"
+>
+  <article class="prose">
+    <header>
+      <h1>{post.title}</h1>
+      <p class="post-meta">
+        <time datetime={post.published}
+          >Published {formatDate(post.published!, settings.locale)}</time
+        >
+        {
+          post.updated && (
+            <span class="updated">
+              Updated{" "}
+              <time datetime={post.updated}>
+                {formatDate(post.updated, settings.locale)}
+              </time>
+            </span>
+          )
+        }
+      </p>
+    </header>
+    <div class="post-body" set:html={post.html} />
+    <footer class="post-footer">
+      {
+        post.tags.length > 0 && (
+          <section aria-labelledby="post-tags-heading">
+            <h2 id="post-tags-heading">Tags</h2>
+            <ul class="tags">
+              {post.tags.map((tag) => (
+                <li>
+                  <a href={`/tags/${tagSlug(tag)}/`}>{tag}</a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
+      }
+      {
+        (previousPost || nextPost) && (
+          <nav class="post-navigation" aria-label="Post navigation">
+            {previousPost && (
+              <a
+                class="post-navigation-link previous"
+                href={`/posts/${previousPost.slug}/`}
+                rel="prev"
+              >
+                <span class="post-navigation-label">
+                  <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16">
+                    <path d="M9.5 3 4.5 8l5 5M5 8h7" />
+                  </svg>
+                  Previous post
+                </span>
+                <span class="post-navigation-title">{previousPost.title}</span>
+              </a>
+            )}
+            {nextPost && (
+              <a
+                class="post-navigation-link next"
+                href={`/posts/${nextPost.slug}/`}
+                rel="next"
+              >
+                <span class="post-navigation-label">
+                  Next post
+                  <svg aria-hidden="true" focusable="false" viewBox="0 0 16 16">
+                    <path d="m6.5 3 5 5-5 5M11 8H4" />
+                  </svg>
+                </span>
+                <span class="post-navigation-title">{nextPost.title}</span>
+              </a>
+            )}
+          </nav>
+        )
+      }
+    </footer>
+  </article>
+</SiteLayout>

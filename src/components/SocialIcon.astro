@@ -1,0 +1,39 @@
+---
+import type { SocialIconName } from "../lib/social-icon-names";
+import { resolveSocialIcon } from "../lib/social-icons";
+
+interface Props {
+  icon: SocialIconName;
+  label: string;
+  href: string;
+}
+
+const resolved = resolveSocialIcon(Astro.props);
+---
+
+{
+  resolved.icon ? (
+    <svg
+      class="social-icon-brand"
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 24 24"
+    >
+      <path d={resolved.icon.path} />
+    </svg>
+  ) : (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.15 1.15" />
+      <path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.15-1.15" />
+    </svg>
+  )
+}

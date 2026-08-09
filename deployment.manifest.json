@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "files": [
+    ".well-known/tdmrep.json",
+    "404.html",
+    "_headers",
+    "_redirects",
+    "about/index.html",
+    "index.html",
+    "robots.txt",
+    "rss.xml",
+    "sitemap.xml",
+    "tags/index.html",
+    "theme.js"
+  ]
+}

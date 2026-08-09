@@ -1,0 +1,15 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { loadSite } from "../lib/content";
+const { settings } = await loadSite();
+---
+
+<SiteLayout settings={settings} title="About" path="/about/">
+  <article class="prose" aria-label="About">
+    <h1>About</h1>
+    <p>
+      This is a manually maintained page. Edit <code>src/pages/about.astro</code
+      > to make it yours.
+    </p>
+  </article>
+</SiteLayout>
