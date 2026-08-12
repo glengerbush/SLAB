@@ -285,6 +285,36 @@ pre {
 code {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
+.post-body [data-footnote-ref] {
+  padding-inline: 0.12em;
+  font-weight: 700;
+  text-decoration: none;
+}
+.post-body [data-footnote-ref]:focus-visible,
+.post-body [data-footnote-backref]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 0.15rem;
+}
+.post-body [data-footnotes] {
+  margin-block-start: var(--space-5);
+  padding-block-start: var(--space-3);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.post-body [data-footnotes] li {
+  scroll-margin-block-start: var(--space-4);
+}
+.post-body [data-footnotes] li:target {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.post-body [data-footnote-backref] {
+  display: inline-block;
+  padding-inline: 0.15rem;
+  text-decoration: none;
+}
 table {
   display: block;
   border-collapse: collapse;

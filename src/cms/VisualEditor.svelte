@@ -7,9 +7,11 @@
   } from "@tiptap/core";
   import Image from "@tiptap/extension-image";
   import { Markdown } from "@tiptap/markdown";
+  import { TextSelection } from "@tiptap/pm/state";
   import StarterKit from "@tiptap/starter-kit";
   import { onMount } from "svelte";
   import { CustomContent, CustomHtmlBlocks } from "./custom-content";
+  import { Footnotes } from "./footnotes";
 
   export interface VisualInsertion {
     id: number;
@@ -29,10 +31,14 @@
   } = $props();
 
   let mount: HTMLDivElement;
+  let footnoteDialog: HTMLDialogElement;
+  let footnoteInput: HTMLTextAreaElement;
   let editor = $state.raw<Editor>();
+  let footnoteText = $state("");
   let transaction = $state(0);
   let handledInsertion = 0;
   let lastValue = "";
+  let footnotePosition = 1;
   let canUndo = $derived.by(() => {
     void transaction;
     return editor?.can().undo() ?? false;
@@ -228,6 +234,64 @@
         .run();
   }
 
+  function nextFootnoteLabel() {
+    const labels = new Set<number>();
+    editor?.state.doc.descendants((node) => {
+      if (node.type.name !== "footnoteDefinition") return;
+      const label = Number(node.attrs.label);
+      if (Number.isSafeInteger(label) && label > 0) labels.add(label);
+    });
+    let label = 1;
+    while (labels.has(label)) label += 1;
+    return String(label);
+  }
+
+  function openFootnoteDialog() {
+    if (!editor) return;
+    footnotePosition = editor.state.selection.to;
+    footnoteText = "";
+    footnoteDialog.showModal();
+    queueMicrotask(() => footnoteInput.focus());
+  }
+
+  function insertFootnote(event: SubmitEvent) {
+    event.preventDefault();
+    if (!editor) return;
+    const text = footnoteText.trim();
+    if (!text) {
+      footnoteInput.setCustomValidity("Enter footnote text.");
+      footnoteInput.reportValidity();
+      return;
+    }
+
+    const label = nextFootnoteLabel();
+    const { schema } = editor.state;
+    const reference = schema.nodes.footnoteReference.create({ label });
+    const paragraphs = text
+      .split(/\n\s*\n/)
+      .map((paragraph) =>
+        schema.nodes.paragraph.create(
+          null,
+          schema.text(paragraph.replace(/\s*\n\s*/g, " ")),
+        ),
+      );
+    const definition = schema.nodes.footnoteDefinition.create(
+      { label },
+      paragraphs,
+    );
+    const position = Math.min(footnotePosition, editor.state.doc.content.size);
+    const transaction = editor.state.tr.insert(position, reference);
+    transaction.insert(transaction.doc.content.size, definition);
+    transaction.setSelection(
+      TextSelection.near(
+        transaction.doc.resolve(position + reference.nodeSize),
+      ),
+    );
+    editor.view.dispatch(transaction.scrollIntoView());
+    footnoteDialog.close();
+    editor.commands.focus();
+  }
+
   onMount(() => {
     lastValue = value;
     editor = new Editor({
@@ -240,6 +304,7 @@
         ImagePair,
         FigureCaption,
         PostFigure,
+        ...Footnotes,
         CustomContent,
         CustomHtmlBlocks,
         Markdown.configure({ markedOptions: { gfm: true } }),
@@ -367,6 +432,9 @@
       onclick={() => editor?.chain().focus().setHorizontalRule().run()}
       >Rule</button
     >
+    <button type="button" aria-label="Footnote" onclick={openFootnoteDialog}
+      ><sup>1</sup> Footnote</button
+    >
     <span class="spacer"></span>
     <button
       type="button"
@@ -382,6 +450,34 @@
     >
   </div>
   <div class="surface" bind:this={mount}></div>
+  <dialog
+    class="footnote-dialog"
+    bind:this={footnoteDialog}
+    aria-labelledby="footnote-dialog-title"
+    onclose={() => footnoteInput?.setCustomValidity("")}
+  >
+    <form onsubmit={insertFootnote}>
+      <h2 id="footnote-dialog-title">Add footnote</h2>
+      <label for="footnote-text">Footnote text</label>
+      <textarea
+        id="footnote-text"
+        bind:this={footnoteInput}
+        bind:value={footnoteText}
+        rows="4"
+        required
+        oninput={() => footnoteInput.setCustomValidity("")}></textarea>
+      <p>
+        A numbered reference will be inserted here; the note will appear at the
+        end.
+      </p>
+      <div class="dialog-actions">
+        <button type="button" onclick={() => footnoteDialog.close()}
+          >Cancel</button
+        >
+        <button type="submit">Add footnote</button>
+      </div>
+    </form>
+  </dialog>
 </div>
 
 <style>
@@ -490,6 +586,59 @@
     margin-left: 0;
     padding-left: 1rem;
     border-left: 3px solid var(--border);
+  }
+  :global(.visual-editor .tiptap .footnote-reference) {
+    padding-inline: 0.12rem;
+    color: var(--link);
+    cursor: default;
+    font-weight: 700;
+  }
+  :global(.visual-editor .tiptap .footnote-definition) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.5rem;
+    padding-block-start: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+  :global(.visual-editor .tiptap .footnote-definition-label) {
+    color: var(--muted);
+    font-weight: 700;
+  }
+  :global(.visual-editor .tiptap .footnote-definition-content > :last-child) {
+    margin-bottom: 0;
+  }
+  .footnote-dialog {
+    width: min(32rem, calc(100% - 2rem));
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    background: var(--surface);
+    color: var(--text);
+  }
+  .footnote-dialog::backdrop {
+    background: rgb(0 0 0 / 45%);
+  }
+  .footnote-dialog form {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .footnote-dialog h2,
+  .footnote-dialog p {
+    margin: 0;
+  }
+  .footnote-dialog p {
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .footnote-dialog textarea {
+    width: 100%;
+    min-height: 6rem;
+    resize: vertical;
+  }
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
   }
   :global(.visual-editor .tiptap .custom-content-placeholder) {
     display: grid;
