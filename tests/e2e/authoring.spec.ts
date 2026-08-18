@@ -789,3 +789,75 @@ test("offers persistent light, dark, and system themes", async ({ page }) => {
   await theme.getByLabel("System").check();
   await expect(page.locator("html")).not.toHaveAttribute("data-theme");
 });
+
+test("honors the browser's forced color palette", async ({ page }) => {
+  await page.emulateMedia({ forcedColors: "active", colorScheme: "dark" });
+  await page.goto("/");
+  await expect(page.getByRole("group", { name: "Theme" })).toBeHidden();
+
+  const sitePalette = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement);
+    const value = (name: string) => style.getPropertyValue(name).trim();
+    return {
+      background: value("--background"),
+      surface: value("--surface"),
+      text: value("--text"),
+      muted: value("--muted"),
+      border: value("--border"),
+      accent: value("--accent"),
+      accentContrast: value("--accent-contrast"),
+      link: value("--link"),
+      visitedLink: value("--visited-link"),
+      focus: value("--focus"),
+    };
+  });
+  expect(sitePalette).toEqual({
+    background: "Canvas",
+    surface: "Canvas",
+    text: "CanvasText",
+    muted: "GrayText",
+    border: "ButtonBorder",
+    accent: "AccentColor",
+    accentContrast: "AccentColorText",
+    link: "LinkText",
+    visitedLink: "VisitedText",
+    focus: "Highlight",
+  });
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = "light";
+  });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  expect(
+    await page.evaluate(() =>
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--background")
+        .trim(),
+    ),
+  ).toBe("Canvas");
+
+  await page.goto("/cms/");
+  await expect(page.getByRole("group", { name: "Theme" })).toBeHidden();
+  const cmsPalette = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement);
+    const value = (name: string) => style.getPropertyValue(name).trim();
+    return {
+      background: value("--bg"),
+      panel: value("--panel"),
+      text: value("--text"),
+      muted: value("--muted"),
+      border: value("--border"),
+      accent: value("--accent"),
+      accentContrast: value("--accent-contrast"),
+    };
+  });
+  expect(cmsPalette).toEqual({
+    background: "Canvas",
+    panel: "Canvas",
+    text: "CanvasText",
+    muted: "GrayText",
+    border: "ButtonBorder",
+    accent: "AccentColor",
+    accentContrast: "AccentColorText",
+  });
+});

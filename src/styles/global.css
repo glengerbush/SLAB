@@ -11,6 +11,7 @@
   --accent: var(--accent-light, var(--accent-base));
   --accent-contrast: #fffcf0;
   --link: var(--accent);
+  --visited-link: var(--link);
   --focus: var(--accent);
   --space-1: 0.35rem;
   --space-2: 0.7rem;
@@ -64,6 +65,27 @@
   color-scheme: light;
 }
 
+@media (forced-colors: active) {
+  :root:not([data-theme]),
+  :root[data-theme] {
+    color-scheme: light dark;
+    --background: Canvas;
+    --surface: Canvas;
+    --text: CanvasText;
+    --muted: GrayText;
+    --border: ButtonBorder;
+    --accent-base: AccentColor !important;
+    --accent: AccentColor;
+    --accent-contrast: AccentColorText !important;
+    --link: LinkText;
+    --visited-link: VisitedText;
+    --focus: Highlight;
+  }
+  .theme-selector {
+    display: none !important;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) .shiki,
   :root:not([data-theme]) .shiki span {
@@ -102,6 +124,9 @@ body {
 a {
   color: var(--link);
   text-underline-offset: 0.16em;
+}
+a:visited {
+  color: var(--visited-link);
 }
 a:hover {
   text-decoration-thickness: 0.14em;

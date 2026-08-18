@@ -3693,6 +3693,32 @@
       color-mix(in srgb, var(--accent-base) 78%, #fffcf0)
     );
   }
+  @media (forced-colors: active) {
+    :global(:root:not([data-theme])),
+    :global(:root[data-theme]) {
+      color-scheme: light dark;
+      --bg: Canvas;
+      --panel: Canvas;
+      --text: CanvasText;
+      --muted: GrayText;
+      --border: ButtonBorder;
+      --accent-base: AccentColor;
+      --accent: AccentColor;
+      --accent-contrast: AccentColorText;
+      --danger: CanvasText;
+      --success: CanvasText;
+      --ready: CanvasText;
+      --unreleased: CanvasText;
+    }
+    .app {
+      --accent-base: AccentColor !important;
+      --accent: AccentColor;
+      --accent-contrast: AccentColorText !important;
+    }
+    .theme-selector {
+      display: none !important;
+    }
+  }
   :global(body) {
     margin: 0;
     padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
