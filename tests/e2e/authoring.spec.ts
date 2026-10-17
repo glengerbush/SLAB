@@ -132,7 +132,9 @@ test("authors a post and settings through the local-only CMS", async ({
     page.getByRole("tooltip").filter({ hasText: "Post body" }),
   ).toBeVisible();
 
-  const titleBox = await page.locator(".post-title input").boundingBox();
+  const titleBox = await page
+    .getByLabel("Title", { exact: true })
+    .boundingBox();
   const descriptionBox = await page
     .locator(".post-description textarea")
     .boundingBox();

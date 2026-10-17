@@ -1955,7 +1955,39 @@
             {/if}
             <div class="editor-head">
               <div>
-                <h1>{selected.title || "Untitled"}</h1>
+                <h1
+                  class="post-title"
+                  aria-label={selected.title || "Untitled"}
+                >
+                  <textarea
+                    id="post-title"
+                    rows="1"
+                    aria-label="Title"
+                    placeholder="Untitled"
+                    required
+                    maxlength="180"
+                    aria-invalid={postValidationAttempted &&
+                      !selected.title.trim()}
+                    aria-describedby={postValidationAttempted &&
+                    !selected.title.trim()
+                      ? "post-title-error"
+                      : undefined}
+                    bind:value={selected.title}
+                    onkeydown={(event) => {
+                      if (event.key === "Enter") event.preventDefault();
+                    }}
+                    oninput={(event) => {
+                      event.currentTarget.value =
+                        event.currentTarget.value.replace(/[\r\n]+/g, " ");
+                      if (creatingPost && !event.currentTarget.value.trim())
+                        selected!.draft = true;
+                    }}></textarea>
+                </h1>
+                {#if postValidationAttempted && !selected.title.trim()}
+                  <small id="post-title-error" class="field-error"
+                    >Enter a Post title.</small
+                  >
+                {/if}
                 <small
                   >{creatingPost
                     ? dirty
@@ -2127,29 +2159,6 @@
               </p>
             {/if}
             <div class="fields">
-              <label class="post-title" for="post-title"
-                >Title <input
-                  id="post-title"
-                  required
-                  maxlength="180"
-                  aria-invalid={postValidationAttempted &&
-                    !selected.title.trim()}
-                  aria-describedby={postValidationAttempted &&
-                  !selected.title.trim()
-                    ? "post-title-error"
-                    : undefined}
-                  bind:value={selected.title}
-                  oninput={() => {
-                    if (creatingPost && !selected?.title.trim())
-                      selected!.draft = true;
-                  }}
-                />
-                {#if postValidationAttempted && !selected.title.trim()}
-                  <small id="post-title-error" class="field-error"
-                    >Enter a Post title.</small
-                  >
-                {/if}</label
-              >
               <div class="field post-description">
                 <div class="field-label-row">
                   <label for="post-description">Post description</label>
@@ -4238,12 +4247,14 @@
     font-size: 0.85rem;
     text-align: right;
   }
-  .fields [aria-invalid="true"] {
+  .fields [aria-invalid="true"],
+  .post-title [aria-invalid="true"] {
     border-color: var(--danger);
     outline: 2px solid color-mix(in srgb, var(--danger) 35%, transparent);
     outline-offset: 1px;
   }
-  .fields .field-error {
+  .fields .field-error,
+  .editor-head .field-error {
     color: var(--danger);
   }
   .publication-control {
@@ -4300,7 +4311,7 @@
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     grid-template-areas:
-      "title title slug tags"
+      "description description slug tags"
       "description description published updated"
       "description description social aliases";
     gap: 0.7rem;
@@ -4311,8 +4322,29 @@
   .fields > .field {
     line-height: 1.2rem;
   }
-  .post-title {
-    grid-area: title;
+  .post-title textarea {
+    display: block;
+    min-width: 0;
+    min-height: 2.75rem;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    font: inherit;
+    line-height: inherit;
+    field-sizing: content;
+    resize: vertical;
+    overflow-wrap: anywhere;
+  }
+  .post-title textarea:hover,
+  .post-title textarea:focus {
+    border-color: var(--border);
+  }
+  .post-title textarea::placeholder {
+    color: var(--muted);
+    opacity: 1;
+  }
+  .editor-head .field-error {
+    display: block;
   }
   .post-description {
     grid-area: description;
@@ -4893,7 +4925,6 @@
     .fields {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       grid-template-areas:
-        "title title"
         "description description"
         "slug tags"
         "published updated"
@@ -4979,7 +5010,6 @@
     .fields {
       grid-template-columns: 1fr;
       grid-template-areas:
-        "title"
         "description"
         "slug"
         "tags"

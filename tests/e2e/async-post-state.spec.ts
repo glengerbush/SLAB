@@ -49,7 +49,7 @@ test("ignores a polling response for a Post that is no longer selected", async (
   await page.getByRole("button", { name: /A private sample draft/ }).click();
   release.resolve();
 
-  await expect(page.locator(".editor-head h1")).toHaveText(
+  await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "A private sample draft",
   );
   await expect(page.getByText("Stale remote response")).toHaveCount(0);
@@ -104,7 +104,7 @@ test("locks Post and section navigation while a save is active", async ({
   await page
     .getByRole("button", { name: /Welcome to the example blog/ })
     .click();
-  await page.locator(".post-title input").fill("Saved without a race");
+  await page.getByLabel("Title", { exact: true }).fill("Saved without a race");
   await page.getByRole("button", { name: /Save/ }).click();
   await requested.promise;
 
