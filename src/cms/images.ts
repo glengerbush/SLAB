@@ -356,7 +356,7 @@ async function writePreparedMedia(
     .join(", ");
   return {
     files,
-    markup: `<img src="/media/${publicFolder}/${base}-${largest}.avif" srcset="${srcset}" sizes="(max-width: 70ch) 100vw, 70ch" width="${prepared.width}" height="${prepared.height}" alt="${escapeAttribute(alt)}" title="${escapeAttribute(alt)}">`,
+    markup: `<img src="/media/${publicFolder}/${base}-${largest}.avif" srcset="${srcset}" sizes="(max-width: 80ch) 100vw, 80ch" width="${prepared.width}" height="${prepared.height}" alt="${escapeAttribute(alt)}" title="${escapeAttribute(alt)}">`,
   };
 }
 
@@ -425,7 +425,7 @@ function mediaMarkup(asset: MediaAsset, alt: string) {
   const text = alt.trim();
   if (!text) throw new Error("Each image requires alt text");
   const responsive = asset.srcset
-    ? ` srcset="${escapeAttribute(asset.srcset)}" sizes="(max-width: 70ch) 100vw, 70ch"`
+    ? ` srcset="${escapeAttribute(asset.srcset)}" sizes="(max-width: 80ch) 100vw, 80ch"`
     : "";
   const dimensions =
     asset.width && asset.height
